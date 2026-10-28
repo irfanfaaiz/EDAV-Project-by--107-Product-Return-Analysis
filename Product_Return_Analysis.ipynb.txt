@@ -1,0 +1,230 @@
+{
+ "cells": [
+  {"cell_type": "markdown", "metadata": {}, "source": ["# EDAV Course-End Project\n", "\n", "## Product Return Pattern Analysis\n", "\n", "Dataset: `large_dataset.csv` — a synthetic retail dataset with 9 columns tracking user-product interactions and whether the product was returned.\n", "\n", "Goal is to go through all 5 units from the syllabus using this data. Some units (like time series) don't fit perfectly since we don't have timestamps, so I've worked around it using `Days_to_Return` as a sort of proxy."]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["import numpy as np\n", "import pandas as pd\n", "import matplotlib.pyplot as plt\n", "import seaborn as sns\n", "from google.colab import files\n", "\n", "sns.set_style(\"whitegrid\")\n", "plt.rcParams[\"figure.figsize\"] = (9, 5)"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["uploaded = files.upload()"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["df = pd.read_csv(\"large_dataset.csv\")\n", "print(\"Shape:\", df.shape)\n", "print()\n", "df.head()"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["# UNIT - I  |  NumPy Basics"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 1.1 — ndarray construction, reshaping, and striding\n", "\n", "Just pulling the core numeric columns into numpy arrays so I can work with them directly."]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["price_arr = df[\"Price\"].to_numpy()\n", "rating_arr = df[\"Product_Rating\"].to_numpy()\n", "wish_arr = df[\"Wishlist_Count\"].to_numpy()\n", "ret_arr = df[\"Return_Status\"].to_numpy()\n", "\n", "print(\"price array shape:\", price_arr.shape, \"| dtype:\", price_arr.dtype)\n", "print(\"First 10 prices:\", price_arr[:10])\n", "\n", "# split into 2D grid just to show reshape - 10 cols wide\n", "grid = price_arr.reshape((len(price_arr) // 10, 10))\n", "print(\"Reshaped grid:\", grid.shape)\n", "print(\"First 2 rows:\")\n", "print(grid[:2])\n", "\n", "# transposed view\n", "print(\"Transposed shape:\", grid.T.shape)"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 1.2 — Arithmetic with numpy arrays"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["# price * wishlist gives an approximate \"demand value\"\n", "demand_value = price_arr * wish_arr\n", "print(\"First 5 demand values:\", demand_value[:5])\n", "print(\"Mean demand value:\", round(float(np.mean(demand_value)), 2))\n", "\n", "# price_per_point_of_rating (a rough value metric)\n", "value_metric = price_arr / rating_arr\n", "print(\"First 5 value metrics:\", np.round(value_metric[:5], 2))\n", "\n", "# how many total returns (sum of the return flag)\n", "print(\"Total returns (numpy sum):\", np.sum(ret_arr))"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 1.3 — Axis reductions & percentiles\n", "\n", "Grouping by category and doing it column-wise. Wanted to see the spread of price per category."]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["categories = df[\"Category\"].unique()\n", "print(\"Categories:\", categories)\n", "print()\n", "\n", "for cat in categories:\n", "    mask = df[\"Category\"].to_numpy() == cat\n", "    p = price_arr[mask]\n", "    print(f\"{cat:12s} | n={len(p):5d} | mean={np.mean(p):7.1f} | std={np.std(p):7.1f} | p95={np.percentile(p, 95):7.1f} | max={np.max(p):7.1f}\")"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 1.4 — Boolean masking & conditional replacement"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "source": ["# find expensive items\n", "expensive = price_arr > 4500\n", "print(\"Number of items priced > 4500:\", np.sum(expensive))\n", "print(\"Prices of those:\", np.sort(price_arr[expensive])[:10], \"...\")\n", "\n", "# cap extreme prices at 5000 (just to show np.where)\n", "capped = np.where(price_arr > 5000, 5000, price_arr)\n", "print(\"\\nBefore capping max:\", np.max(price_arr))\n", "print(\"After capping max :\", np.max(capped))"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 1.5 — Broadcasting & normalization"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "source": ["# min-max normalize price\n", "pmin, pmax = np.min(price_arr), np.max(price_arr)\n", "price_norm = (price_arr - pmin) / (pmax - pmin)\n", "print(\"Normalized range:\", np.min(price_norm), \"to\", np.max(price_norm))\n", "\n", "# z-score on rating\n", "z_rating = (rating_arr - np.mean(rating_arr)) / np.std(rating_arr)\n", "print(\"Z-score rating mean:\", round(float(np.mean(z_rating)), 4))\n", "print(\"Z-score rating std :\", round(float(np.std(z_rating)), 4))"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 1.6 — Clip, ptp, and percentile clamping"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["print(\"Peak-to-peak on price:\", np.ptp(price_arr))\n", "print(\"Peak-to-peak on wishlist:\", np.ptp(wish_arr))\n", "print(\"Peak-to-peak on rating:\", np.ptp(rating_arr))\n", "\n", "clamped = np.clip(price_arr, a_min=500, a_max=3000)\n", "print(\"\\nClamped range:\", np.min(clamped), \"to\", np.max(clamped))"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 1.7 — Stacking arrays"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["# column-stack price with wishlist count\n", "col_stack = np.column_stack((price_arr[:15], wish_arr[:15]))\n", "print(\"Col stack shape:\", col_stack.shape)\n", "print(col_stack[:5])\n", "\n", "# stack two slices\n", "v_stack = np.vstack((price_arr[:5], price_arr[5:10]))\n", "print(\"\\nV-stack shape:\", v_stack.shape)"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 1.8 — Diffs and gradient on sorted values"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "source": ["# sort the days to return (valid only) and look at gaps\n", "valid_days = df.loc[df[\"Days_to_Return\"] >= 0, \"Days_to_Return\"].to_numpy()\n", "sorted_days = np.sort(valid_days)\n", "\n", "diffs = np.diff(sorted_days[:100])\n", "grads = np.gradient(sorted_days[:100].astype(float))\n", "\n", "print(\"First 10 diffs:\", diffs[:10])\n", "print(\"First 10 gradients:\", np.round(grads[:10], 2))"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 1.9 — Cumulative sums"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["# sort by price and see cumulative revenue\n", "sorted_price = np.sort(price_arr)\n", "cumulative = np.cumsum(sorted_price)\n", "\n", "print(\"Total revenue (all products):\", cumulative[-1])\n", "print(\"Cumulative revenue at 25% mark:\", cumulative[len(cumulative) // 4])\n", "print(\"Cumulative revenue at 50% mark:\", cumulative[len(cumulative) // 2])"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 1.10 — Index lookups with argmax, argmin, where"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "source": ["max_idx = np.argmax(price_arr)\n", "min_idx = np.argmin(price_arr)\n", "print(f\"Most expensive product (idx {max_idx}): price = {price_arr[max_idx]}\")\n", "print(f\"Cheapest product (idx {min_idx}): price = {price_arr[min_idx]}\")\n", "\n", "high_wish_idx = np.where(wish_arr > 40)[0]\n", "print(f\"\\nProducts with wishlist > 40: {len(high_wish_idx)} of {len(wish_arr)}\")"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["# UNIT - II  |  Pandas Foundations"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 2.1 — Schema audit and memory"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["df.info()\n", "print()\n", "mem = df.memory_usage(deep=True).sum() / 1024\n", "print(f\"Memory: {mem:.2f} KB\")"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 2.2 — iloc vs loc"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["print(\"iloc rows 10-15, cols 0-3:\")\n", "print(df.iloc[10:15, 0:3])\n", "\n", "print(\"\\nloc - returned items from Sports only, first 5:\")\n", "print(df.loc[(df[\"Category\"] == \"Sports\") & (df[\"Return_Status\"] == 1), [\"Product_ID\", \"Price\", \"Return_Status\"]].head(5))"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 2.3 — Multi-criteria filtering"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "source": ["# high value products that were returned AND had low rating\n", "filtered = df[\n", "    (df[\"Price\"] > 3000) &\n", "    (df[\"Product_Rating\"] < 2.5) &\n", "    (df[\"Return_Status\"] == 1)\n", "]\n", "print(\"Filtered count:\", len(filtered))\n", "print(filtered[[\"Product_ID\", \"Category\", \"Price\", \"Product_Rating\"]].head())"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 2.4 — Feature engineering"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["# some derived features\n", "df[\"Value_Score\"] = (df[\"Product_Rating\"] / df[\"Price\"]) * 1000\n", "df[\"High_Wishlist\"] = df[\"Wishlist_Count\"] > 25\n", "df[\"Price_Band\"] = pd.cut(df[\"Price\"], bins=[0, 1000, 2500, 5000], labels=[\"Low\", \"Mid\", \"High\"])\n", "\n", "df[[\"Product_ID\", \"Price\", \"Value_Score\", \"High_Wishlist\", \"Price_Band\"]].head()"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 2.5 — Descriptive stats & sorting"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["# percentiles\n", "stats = df[[\"Price\", \"Product_Rating\", \"Wishlist_Count\"]].describe(percentiles=[0.1, 0.25, 0.5, 0.75, 0.9]).round(2)\n", "print(stats)\n", "\n", "# top 3 most expensive per category\n", "print(\"\\nTop 3 by category:\")\n", "print(df.sort_values([\"Category\", \"Price\"], ascending=[True, False]).groupby(\"Category\").head(3)[[\"Category\", \"Product_ID\", \"Price\"]])"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 2.6 — Rename and drop"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["df_renamed = df.rename(columns={\"Product_Rating\": \"Rating\", \"Wishlist_Count\": \"Wishlists\"})\n", "df_pruned = df_renamed.drop(columns=[\"Value_Score\", \"High_Wishlist\"])\n", "print(\"Columns after rename + drop:\", list(df_pruned.columns))"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 2.7 — Value counts & cardinality"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["print(\"Category counts:\")\n", "print(df[\"Category\"].value_counts())\n", "print()\n", "print(\"Unique users:\", df[\"User_ID\"].nunique())\n", "print(\"Unique products:\", df[\"Product_ID\"].nunique())"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 2.8 — pd.cut and pd.qcut"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["df[\"Price_Tier\"] = pd.cut(df[\"Price\"], bins=[0, 1500, 3000, 5000], labels=[\"Budget\", \"Standard\", \"Premium\"])\n", "df[\"Rating_Quartile\"] = pd.qcut(df[\"Product_Rating\"], q=4, labels=[\"Q1_Low\", \"Q2\", \"Q3\", \"Q4_High\"])\n", "\n", "print(df[[\"Price\", \"Price_Tier\", \"Product_Rating\", \"Rating_Quartile\"]].head(8))"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 2.9 — Query filtering"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["result = df.query(\"Category == 'Beauty' and Price > 2000 and Product_Rating >= 4.0\")\n", "print(\"Count:\", len(result))\n", "print(result[[\"Product_ID\", \"Price\", \"Product_Rating\"]].head())"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 2.10 — String operations"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["# just playing with Product_ID string manipulation\n", "df[\"PID_Numeric\"] = df[\"Product_ID\"].str.replace(\"P\", \"\", regex=False).astype(int)\n", "df[\"Cat_Upper\"] = df[\"Category\"].str.upper()\n", "\n", "print(df[[\"Product_ID\", \"PID_Numeric\", \"Category\", \"Cat_Upper\"]].head())\n", "print()\n", "print(\"Category contains 'Sport':\", df[\"Category\"].str.contains(\"Sport\").sum())"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["# UNIT - III  |  Data Cleaning and Preparation"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 3.1 — Missing values audit\n", "\n", "Turns out we have no NaN, but `Days_to_Return = -1` is basically a missing value in disguise."]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["print(\"Real NaNs per column:\")\n", "print(df.isnull().sum())\n", "print()\n", "print(\"Pseudo-missing (Days_to_Return == -1):\", (df[\"Days_to_Return\"] == -1).sum())\n", "\n", "# convert -1 to NaN in a fresh column\n", "df[\"Days_Clean\"] = df[\"Days_to_Return\"].replace(-1, np.nan)\n", "print(\"After conversion - NaN count:\", df[\"Days_Clean\"].isnull().sum())"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 3.2 — Duplicates & string cleanup"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["print(\"Full-row duplicates:\", df.duplicated().sum())\n", "print(\"Duplicate User_IDs:\", df[\"User_ID\"].duplicated().sum())\n", "\n", "# strip whitespace from category just in case\n", "df[\"Category\"] = df[\"Category\"].str.strip().str.title()\n", "print(\"\\nCategories after cleanup:\", sorted(df[\"Category\"].unique()))"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 3.3 — Type casting"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["print(\"Before casting:\")\n", "print(df.dtypes)\n", "\n", "df[\"Return_Status\"] = df[\"Return_Status\"].astype(\"int8\")\n", "df[\"Return_History\"] = df[\"Return_History\"].astype(\"int8\")\n", "df[\"Category\"] = df[\"Category\"].astype(\"category\")\n", "\n", "print(\"\\nAfter casting:\")\n", "print(df.dtypes)"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 3.4 — Splitting and concatenating"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["# pretend we got the data in two batches - split and recombine\n", "batch_a = df.iloc[:500].copy()\n", "batch_b = df.iloc[500:].copy()\n", "\n", "print(\"Batch A:\", len(batch_a), \"| Batch B:\", len(batch_b))\n", "\n", "recombined = pd.concat([batch_a, batch_b], ignore_index=True)\n", "print(\"Recombined:\", len(recombined), \"| matches original:\", len(recombined) == len(df))"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 3.5 — Pivot vs melt"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["# pivot: category x return_status showing avg price\n", "wide = df.pivot_table(index=\"Category\", columns=\"Return_Status\", values=\"Price\", aggfunc=\"mean\")\n", "print(\"Wide pivot shape:\", wide.shape)\n", "print(wide.round(1))\n", "\n", "# melt it back\n", "long = wide.reset_index().melt(id_vars=\"Category\", var_name=\"Returned\", value_name=\"Mean_Price\")\n", "print(\"\\nLong shape:\", long.shape)\n", "print(long.head())"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 3.6 — Winsorization on price"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["q_low = df[\"Price\"].quantile(0.02)\n", "q_high = df[\"Price\"].quantile(0.98)\n", "df[\"Price_Winsorized\"] = df[\"Price\"].clip(lower=q_low, upper=q_high)\n", "\n", "print(f\"Original range: [{df['Price'].min():.0f}, {df['Price'].max():.0f}]\")\n", "print(f\"Winsorized   : [{df['Price_Winsorized'].min():.0f}, {df['Price_Winsorized'].max():.0f}]\")"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 3.7 — Crosstab contingency"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["ct = pd.crosstab(df[\"Category\"], df[\"Return_Status\"], margins=True)\n", "print(ct)\n", "print()\n", "print(\"As percentages (row-wise):\")\n", "print((pd.crosstab(df[\"Category\"], df[\"Return_Status\"], normalize=\"index\") * 100).round(2))"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 3.8 — Value mapping"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["# group categories into broader sectors\n", "sector_map = {\n", "    \"Fashion\": \"Lifestyle\",\n", "    \"Beauty\": \"Lifestyle\",\n", "    \"Electronics\": \"Tech\",\n", "    \"Sports\": \"Active\",\n", "    \"Home\": \"Home\"\n", "}\n", "df[\"Sector\"] = df[\"Category\"].map(sector_map)\n", "\n", "print(df.groupby(\"Sector\", observed=True).size())"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 3.9 — Downcasting for memory"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["mem_before = df.memory_usage(deep=True).sum() / 1024\n", "print(f\"Before: {mem_before:.2f} KB\")\n", "\n", "df[\"Price\"] = pd.to_numeric(df[\"Price\"], downcast=\"float32\")\n", "df[\"Wishlist_Count\"] = pd.to_numeric(df[\"Wishlist_Count\"], downcast=\"int16\")\n", "\n", "mem_after = df.memory_usage(deep=True).sum() / 1024\n", "print(f\"After : {mem_after:.2f} KB\")"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 3.10 — Lambda apply"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "source": ["# quick label based on price + rating combined\n", "df[\"Risk_Label\"] = df.apply(\n", "    lambda r: \"High\" if r[\"Price\"] > 3500 and r[\"Product_Rating\"] < 2.5\n", "              else (\"Low\" if r[\"Price\"] < 1000 or r[\"Product_Rating\"] > 4.5 else \"Mid\"),\n", "    axis=1\n", ")\n", "\n", "print(df[\"Risk_Label\"].value_counts())\n", "print()\n", "print(\"Return rate by risk label:\")\n", "print(df.groupby(\"Risk_Label\")[\"Return_Status\"].mean().round(3))"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["# UNIT - IV  |  Aggregation & Group Operations"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 4.1 — \"Temporal\" decomposition\n", "\n", "No real timestamps here, so I'm using `Days_to_Return` as a pseudo time variable. Bucketing into fast / medium / slow returns."]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["df[\"Return_Speed\"] = pd.cut(\n", "    df[\"Days_Clean\"],\n", "    bins=[0, 7, 15, 22, 31],\n", "    labels=[\"Fast(0-7)\", \"Med(8-15)\", \"Slow(16-22)\", \"V.Slow(23-30)\"]\n", ")\n", "\n", "print(df[\"Return_Speed\"].value_counts().sort_index())"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 4.2 — Multi-tier groupby"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["multi = df.groupby([\"Category\", \"Return_Status\"], observed=True)[\"Price\"].agg(\n", "    Mean=\"mean\", Median=\"median\", Min=\"min\", Max=\"max\", Count=\"count\"\n", ").reset_index().round(1)\n", "\n", "print(multi.head(10))"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 4.3 — Bucket \"resampling\" on Days_to_Return"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["# sort and group by day, count how many returns happen on each day\n", "daily = df[df[\"Days_Clean\"].notna()].groupby(df[\"Days_Clean\"].astype(int))[\"Return_Status\"].agg(\n", "    [\"count\", \"mean\"]\n", ")\n", "daily.columns = [\"Returns_On_Day\", \"Rate\"]\n", "print(daily.head(10))\n", "print(\"...\")\n", "print(daily.tail(5))"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 4.4 — Rolling window on sorted prices"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["sorted_price = df.sort_values(\"Price\")[\"Price\"].reset_index(drop=True)\n", "rolling_mean = sorted_price.rolling(window=20).mean()\n", "rolling_std = sorted_price.rolling(window=20).std()\n", "\n", "print(\"Rolling mean (last 5):\", rolling_mean.tail().round(1).tolist())\n", "print(\"Rolling std  (last 5):\", rolling_std.tail().round(1).tolist())"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 4.5 — Cumulative & rank"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["df[\"Cumulative_Returns\"] = df.groupby(\"Category\", observed=True)[\"Return_Status\"].cumsum()\n", "df[\"Price_Rank_In_Cat\"] = df.groupby(\"Category\", observed=True)[\"Price\"].rank(ascending=False, method=\"dense\")\n", "\n", "print(df[[\"Category\", \"Price\", \"Price_Rank_In_Cat\", \"Return_Status\", \"Cumulative_Returns\"]].head(10))"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 4.6 — Expanding window"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["sorted_w = df.sort_values(\"Wishlist_Count\")[\"Wishlist_Count\"].reset_index(drop=True)\n", "exp_mean = sorted_w.expanding(min_periods=1).mean()\n", "exp_max = sorted_w.expanding(min_periods=1).max()\n", "\n", "print(\"First 5 expanding means:\", exp_mean.head().round(2).tolist())\n", "print(\"Last 5 expanding means :\", exp_mean.tail().round(2).tolist())\n", "print(\"Max wishlist seen so far:\", exp_max.iloc[-1])"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 4.7 — EWMA on wishlist"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["sorted_wish = df.sort_values(\"Wishlist_Count\")[\"Wishlist_Count\"].reset_index(drop=True)\n", "ewma = sorted_wish.ewm(span=10, adjust=False).mean()\n", "\n", "print(\"First 5 EWMA:\", ewma.head().round(2).tolist())\n", "print(\"Last 5 EWMA :\", ewma.tail().round(2).tolist())"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 4.8 — Shift and lag\n", "\n", "Simulating a lag by shifting the sorted days-to-return values."]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["days_sorted = df[df[\"Days_Clean\"].notna()].sort_values(\"Days_Clean\").reset_index(drop=True)\n", "days_sorted[\"Lag_1\"] = days_sorted[\"Days_Clean\"].shift(1)\n", "days_sorted[\"Delta\"] = days_sorted[\"Days_Clean\"] - days_sorted[\"Lag_1\"]\n", "\n", "print(days_sorted[[\"Days_Clean\", \"Lag_1\", \"Delta\"]].dropna().head(10))"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 4.9 — Pivot with margins"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["pt = pd.pivot_table(\n", "    df, index=\"Category\", columns=\"Price_Band\", values=\"Return_Status\",\n", "    aggfunc=\"mean\", margins=True, margins_name=\"Overall\"\n", ")\n", "print((pt * 100).round(2))"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 4.10 — Grouped Z-score anomalies"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["def zscore(x):\n", "    return (x - x.mean()) / (x.std() + 1e-8)\n", "\n", "df[\"Price_Z\"] = df.groupby(\"Category\", observed=True)[\"Price\"].transform(zscore)\n", "anomalies = df[df[\"Price_Z\"].abs() > 2.5]\n", "print(\"Price anomalies per category:\", len(anomalies))\n", "print(anomalies[[\"Category\", \"Price\", \"Price_Z\"]].head())"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["# UNIT - V  |  Plotting & Visualization"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 5.1 — Distribution of Price (hist + KDE)"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["fig, ax = plt.subplots()\n", "sns.histplot(df[\"Price\"], bins=35, kde=True, color=\"steelblue\", ax=ax)\n", "ax.set_title(\"Price distribution across all products\")\n", "ax.set_xlabel(\"Price\")\n", "plt.tight_layout()\n", "plt.show()"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 5.2 — Boxplot: Price by Category"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["fig, ax = plt.subplots()\n", "sns.boxplot(data=df, x=\"Category\", y=\"Price\", palette=\"Set2\", ax=ax)\n", "ax.set_title(\"Price spread by category\")\n", "plt.tight_layout()\n", "plt.show()"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 5.3 — Return rate bar chart"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["rates = df.groupby(\"Category\", observed=True)[\"Return_Status\"].mean() * 100\n", "rates = rates.sort_values(ascending=False)\n", "overall = df[\"Return_Status\"].mean() * 100\n", "\n", "plt.figure(figsize=(9, 5))\n", "bars = plt.bar(rates.index, rates.values, color=\"#4C72B0\", edgecolor=\"black\")\n", "plt.bar_label(bars, fmt=\"%.1f%%\")\n", "plt.axhline(overall, color=\"red\", linestyle=\"--\", label=f\"Overall {overall:.1f}%\")\n", "plt.title(\"Return rate by category\")\n", "plt.ylabel(\"Rate (%)\")\n", "plt.legend()\n", "plt.tight_layout()\n", "plt.show()"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 5.4 — Scatter: Price vs Wishlist colored by Return"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["fig, ax = plt.subplots()\n", "sns.scatterplot(data=df.sample(800, random_state=1), x=\"Price\", y=\"Wishlist_Count\",\n", "                hue=\"Return_Status\", palette={0: \"green\", 1: \"red\"}, alpha=0.6, ax=ax)\n", "ax.set_title(\"Price vs Wishlist (colored by return)\")\n", "plt.tight_layout()\n", "plt.show()"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 5.5 — Correlation heatmap"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["cols = [\"Price\", \"Wishlist_Count\", \"Return_History\", \"Product_Rating\", \"Return_Status\", \"Days_Clean\"]\n", "corr = df[cols].corr()\n", "\n", "fig, ax = plt.subplots(figsize=(8, 6))\n", "sns.heatmap(corr, annot=True, cmap=\"coolwarm\", fmt=\".2f\", vmin=-1, vmax=1, ax=ax)\n", "ax.set_title(\"Correlation matrix\")\n", "plt.tight_layout()\n", "plt.show()"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 5.6 — Violin plots"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["fig, ax = plt.subplots(figsize=(10, 5))\n", "sns.violinplot(data=df, x=\"Category\", y=\"Product_Rating\", inner=\"quart\",\n", "               palette=\"Pastel1\", ax=ax)\n", "ax.set_title(\"Rating distribution across categories\")\n", "plt.tight_layout()\n", "plt.show()"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 5.7 — FacetGrid by category"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["g = sns.FacetGrid(df, col=\"Category\", col_wrap=3, height=3.5, aspect=1.2)\n", "g.map_dataframe(sns.histplot, x=\"Price\", bins=20, color=\"crimson\")\n", "g.set_titles(col_template=\"{col_name}\")\n", "g.fig.suptitle(\"Price distribution per category\", y=1.02)\n", "plt.show()"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 5.8 — Bar chart with CI: Wishlist by return status"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["fig, ax = plt.subplots()\n", "sns.barplot(data=df, x=\"Category\", y=\"Wishlist_Count\", hue=\"Return_Status\",\n", "            palette=\"Blues\", errorbar=(\"ci\", 95), ax=ax)\n", "ax.set_title(\"Avg wishlist count per category (weekday/weekend style)\")\n", "plt.xticks(rotation=20)\n", "plt.tight_layout()\n", "plt.show()"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 5.9 — Jointplot of Price vs Rating"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["jp = sns.jointplot(data=df, x=\"Price\", y=\"Product_Rating\", kind=\"hex\", color=\"darkcyan\", height=6)\n", "jp.fig.suptitle(\"Joint distribution - Price vs Rating\", y=1.02)\n", "plt.show()"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["## Program 5.10 — Bubble plot of category summary"]},
+
+  {"cell_type": "code", "execution_count": null, "metadata": {}, "outputs": [], "source": ["summary = df.groupby(\"Category\", observed=True).agg(\n", "    Avg_Price=(\"Price\", \"mean\"),\n", "    Return_Rate=(\"Return_Status\", \"mean\"),\n", "    Count=(\"Return_Status\", \"count\")\n", ").reset_index()\n", "summary[\"Return_Rate\"] *= 100\n", "\n", "plt.figure(figsize=(10, 6))\n", "plt.scatter(summary[\"Avg_Price\"], summary[\"Return_Rate\"],\n", "            s=summary[\"Count\"] / 2, alpha=0.6, edgecolor=\"black\", c=\"steelblue\")\n", "for i, row in summary.iterrows():\n", "    plt.annotate(row[\"Category\"], (row[\"Avg_Price\"], row[\"Return_Rate\"]), ha=\"center\")\n", "plt.xlabel(\"Average price\")\n", "plt.ylabel(\"Return rate (%)\")\n", "plt.title(\"Category level summary (bubble size = # records)\")\n", "plt.grid(True, alpha=0.3)\n", "plt.tight_layout()\n", "plt.show()"]},
+
+  {"cell_type": "markdown", "metadata": {}, "source": ["# Final Notes\n", "\n", "Going through all 5 units on this dataset. Quick summary of what I actually found:\n", "\n", "- Return rate hovers around 50% across all categories — Sports and Beauty slightly higher, Fashion and Home slightly lower. No dramatic difference.\n", "- Price, rating, wishlist count, and prior return history all show near-zero correlation with current return. Single-variable analysis is a dead end here.\n", "- Days_to_Return has about 5% entries with -1, which I treated as missing. When excluded, valid return days spread between 1 and 30 with no clear mode.\n", "- Combining Price and Rating into a \"risk label\" was actually the most interesting thing — items flagged High risk (expensive + low rating) still only had marginal lift over Mid. So even two-variable interactions aren't strong predictors here.\n", "- The dataset is synthetic so this is expected. With real data I'd try customer-level features (purchase frequency, tenure, past returns per user) and product content signals (size, brand, description quality)."]}
+ ],
+ "metadata": {
+  "colab": {"provenance": []},
+  "kernelspec": {"display_name": "Python 3", "name": "python3"},
+  "language_info": {"name": "python"}
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
